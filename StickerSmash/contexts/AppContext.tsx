@@ -20,6 +20,8 @@ type AppState = {
   skills: UserSkill[];
   theme: ThemeMode;
 
+  unlockedAchievementIds: string[];
+
   addSkill: (skill: CatalogSkill) => void;
 
   addCustomSkill: (
@@ -34,6 +36,8 @@ type AppState = {
 
   removeSkill: (id: string) => void;
 
+  unlockAchievement: (id: string) => void;
+
   setTheme: (theme: ThemeMode) => void;
 };
 
@@ -45,7 +49,13 @@ export function AppProvider({
 }: {
   children: ReactNode;
 }) {
-  const [skills, setSkills] = useState<UserSkill[]>([]);
+  const [skills, setSkills] =
+    useState<UserSkill[]>([]);
+
+  const [
+    unlockedAchievementIds,
+    setUnlockedAchievementIds,
+  ] = useState<string[]>([]);
 
   const [theme, setThemeState] =
     useState<ThemeMode>(
@@ -56,31 +66,54 @@ export function AppProvider({
 
   useEffect(() => {
     async function loadSavedData() {
-      const rows = await AsyncStorage.multiGet([
-        'skillplus.skills',
-        'skillplus.theme',
-      ]);
+      try {
+        const rows =
+          await AsyncStorage.multiGet([
+            'skillplus.skills',
+            'skillplus.theme',
+            'skillplus.achievements',
+          ]);
 
-      const savedSkills = rows[0][1];
-      const savedTheme = rows[1][1];
+        const savedSkills =
+          rows[0][1];
 
-      if (savedSkills) {
-        const parsed: UserSkill[] =
-          JSON.parse(savedSkills);
+        const savedTheme =
+          rows[1][1];
 
-        // Makes old saved skills compatible
-        // with the new media feature.
-        const repaired = parsed.map((skill) => ({
-          ...skill,
-          media: skill.media ?? [],
-        }));
+        const savedAchievements =
+          rows[2][1];
 
-        setSkills(repaired);
-      }
+        if (savedSkills) {
+          const parsed: UserSkill[] =
+            JSON.parse(savedSkills);
 
-      if (savedTheme) {
-        setThemeState(
-          savedTheme as ThemeMode
+          const repaired =
+            parsed.map((skill) => ({
+              ...skill,
+              media:
+                skill.media ?? [],
+            }));
+
+          setSkills(repaired);
+        }
+
+        if (savedTheme) {
+          setThemeState(
+            savedTheme as ThemeMode
+          );
+        }
+
+        if (savedAchievements) {
+          setUnlockedAchievementIds(
+            JSON.parse(
+              savedAchievements
+            )
+          );
+        }
+      } catch (error) {
+        console.error(
+          'Failed to load saved app data:',
+          error
         );
       }
     }
@@ -92,34 +125,62 @@ export function AppProvider({
     AsyncStorage.setItem(
       'skillplus.skills',
       JSON.stringify(skills)
-    );
+    ).catch((error) => {
+      console.error(
+        'Failed to save skills:',
+        error
+      );
+    });
   }, [skills]);
 
-  const addSkill = (skill: CatalogSkill) => {
-    setSkills((current) => {
-      const alreadyAdded = current.some(
-        (item) => item.id === skill.id
+  useEffect(() => {
+    AsyncStorage.setItem(
+      'skillplus.achievements',
+      JSON.stringify(
+        unlockedAchievementIds
+      )
+    ).catch((error) => {
+      console.error(
+        'Failed to save achievements:',
+        error
       );
+    });
+  }, [unlockedAchievementIds]);
+
+  const addSkill = (
+    skill: CatalogSkill
+  ) => {
+    setSkills((current) => {
+      const alreadyAdded =
+        current.some(
+          (item) =>
+            item.id === skill.id
+        );
 
       if (alreadyAdded) {
         return current;
       }
 
-      const newSkill: UserSkill = {
-        ...skill,
+      const newSkill: UserSkill =
+        {
+          ...skill,
 
-        userSkillId: `local-${Date.now()}`,
+          userSkillId:
+            `local-${Date.now()}`,
 
-        status: 'in_progress',
+          status: 'in_progress',
 
-        repetitions: 0,
-        seconds: 0,
-        xp: 0,
+          repetitions: 0,
+          seconds: 0,
+          xp: 0,
 
-        media: [],
-      };
+          media: [],
+        };
 
-      return [...current, newSkill];
+      return [
+        ...current,
+        newSkill,
+      ];
     });
   };
 
@@ -155,7 +216,9 @@ export function AppProvider({
     );
   };
 
-  const removeSkill = (id: string) => {
+  const removeSkill = (
+    id: string
+  ) => {
     setSkills((current) =>
       current.filter(
         (skill) =>
@@ -164,37 +227,77 @@ export function AppProvider({
     );
   };
 
-  const setTheme = (newTheme: ThemeMode) => {
+  const unlockAchievement = (
+    id: string
+  ) => {
+    setUnlockedAchievementIds(
+      (current) => {
+        if (
+          current.includes(id)
+        ) {
+          return current;
+        }
+
+        return [
+          ...current,
+          id,
+        ];
+      }
+    );
+  };
+
+  const setTheme = (
+    newTheme: ThemeMode
+  ) => {
     setThemeState(newTheme);
 
     AsyncStorage.setItem(
       'skillplus.theme',
       newTheme
-    );
+    ).catch((error) => {
+      console.error(
+        'Failed to save theme:',
+        error
+      );
+    });
   };
 
-  const value = useMemo(
-    () => ({
-      skills,
-      theme,
-      addSkill,
-      addCustomSkill,
-      updateSkill,
-      removeSkill,
-      setTheme,
-    }),
-    [skills, theme]
-  );
+  const value =
+    useMemo<AppState>(
+      () => ({
+        skills,
+        theme,
+
+        unlockedAchievementIds,
+
+        addSkill,
+        addCustomSkill,
+        updateSkill,
+        removeSkill,
+
+        unlockAchievement,
+
+        setTheme,
+      }),
+      [
+        skills,
+        theme,
+        unlockedAchievementIds,
+      ]
+    );
 
   return (
-    <AppContext.Provider value={value}>
+    <AppContext.Provider
+      value={value}
+    >
       {children}
     </AppContext.Provider>
   );
 }
 
 export function useApp() {
-  const value = useContext(AppContext);
+  const value =
+    useContext(AppContext);
 
   if (!value) {
     throw new Error(
@@ -205,7 +308,9 @@ export function useApp() {
   return value;
 }
 
-export const palette = (dark: boolean) =>
+export const palette = (
+  dark: boolean
+) =>
   dark
     ? {
         bg: '#121212',
