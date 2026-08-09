@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "StickerSmash",
-    "slug": "StickerSmash",
+    "name": "Skillplus",
+    "slug": "Skill-plus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.obaida-taha.StickerSmash"
+      "bundleIdentifier": "com.obaida-taha.skillplus"
     },
     "android": {
       "adaptiveIcon": {
