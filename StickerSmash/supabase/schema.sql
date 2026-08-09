@@ -1,0 +1,18 @@
+create extension if not exists "uuid-ossp";
+create type public.skill_difficulty as enum ('Beginner','Intermediate','Advanced');
+create type public.skill_status as enum ('in_progress','paused','finished');
+
+create table public.profiles (id uuid primary key references auth.users(id) on delete cascade, display_name text not null default '', bio text not null default '', personal_goal text not null default '', total_xp integer not null default 0, streak integer not null default 0, created_at timestamptz not null default now());
+create table public.skills (id uuid primary key default uuid_generate_v4(), category varchar(100) not null, sub_category varchar(100) not null, name varchar(100) not null, difficulty public.skill_difficulty not null, estimated_hours varchar(25) not null, description varchar(500) not null, icon varchar(500), created_at timestamptz not null default now());
+create table public.user_skills (id uuid primary key default uuid_generate_v4(), user_id uuid not null references public.profiles(id) on delete cascade, skill_id uuid references public.skills(id) on delete set null, custom_name varchar(100), custom_category varchar(100), status public.skill_status not null default 'in_progress', repetitions integer not null default 0 check(repetitions>=0), practiced_seconds integer not null default 0 check(practiced_seconds>=0), xp integer not null default 0 check(xp>=0), started_at timestamptz not null default now(), finished_at timestamptz);
+create table public.skill_proofs (id uuid primary key default uuid_generate_v4(), user_skill_id uuid not null references public.user_skills(id) on delete cascade, user_id uuid not null references public.profiles(id) on delete cascade, storage_path text not null, media_type text not null check(media_type in ('image','video')), caption text, created_at timestamptz not null default now());
+create table public.achievements (id text primary key, name text not null, description text not null, kind text not null, threshold integer not null, icon text);
+create table public.user_achievements (user_id uuid references public.profiles(id) on delete cascade, achievement_id text references public.achievements(id) on delete cascade, unlocked_at timestamptz not null default now(), primary key(user_id,achievement_id));
+
+alter table public.profiles enable row level security; alter table public.skills enable row level security; alter table public.user_skills enable row level security; alter table public.skill_proofs enable row level security; alter table public.achievements enable row level security; alter table public.user_achievements enable row level security;
+create policy "catalog readable" on public.skills for select using (true); create policy "achievements readable" on public.achievements for select using (true);
+create policy "own profile" on public.profiles for all using (auth.uid()=id) with check(auth.uid()=id); create policy "own user skills" on public.user_skills for all using (auth.uid()=user_id) with check(auth.uid()=user_id); create policy "own proofs" on public.skill_proofs for all using (auth.uid()=user_id) with check(auth.uid()=user_id); create policy "own unlocked achievements" on public.user_achievements for select using (auth.uid()=user_id);
+create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path=public as $$ begin insert into public.profiles(id,display_name) values(new.id,coalesce(new.raw_user_meta_data->>'display_name','')); return new; end; $$;
+create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
+
+-- Import CSV in Supabase Table Editor after mapping subCategory→sub_category and estimatedHours→estimated_hours.
