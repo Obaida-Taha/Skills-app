@@ -9,14 +9,18 @@
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.obaidataha.skillplus"
+      "bundleIdentifier": "com.obaidataha.skillplus",
+      "appleTeamId": "TQ8K5RDT5N"
     },
     "android": {
       "package": "com.obaidataha.skillplus",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#7357FF"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro"
@@ -27,10 +31,10 @@
       [
         "expo-splash-screen",
         {
-            "image": "./assets/splash.png",
-            "resizeMode": "cover",
-            "backgroundColor": "#121212",
-            "enableFullScreenImage_legacy": true
+          "image": "./assets/splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#121212",
+          "enableFullScreenImage_legacy": true
         }
       ]
     ],
