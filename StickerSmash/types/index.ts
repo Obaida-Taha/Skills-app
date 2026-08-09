@@ -40,3 +40,15 @@ export type UserSkill = CatalogSkill & {
   // Photos and videos documenting the skill
   media: SkillMedia[];
 };
+
+export type UserProfile = {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  total_xp: number;
+  created_at: string;
+  updated_at: string;
+};
