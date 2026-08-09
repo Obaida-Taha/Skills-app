@@ -18,4 +18,25 @@ export function AppProvider({children}:{children:ReactNode}){
  return <C.Provider value={useMemo(()=>({skills,theme,addSkill,addCustomSkill,updateSkill,removeSkill,setTheme}),[skills,theme])}>{children}</C.Provider>
 }
 export const useApp=()=>{const v=useContext(C);if(!v)throw new Error('AppProvider missing');return v};
-export const palette=(dark:boolean)=>dark?{bg:'#111018',card:'#1D1B28',text:'#F6F3FF',muted:'#AAA5B8',primary:'#9A85FF',border:'#302C40',danger:'#FF6B7A'}:{bg:'#F7F6FB',card:'#FFFFFF',text:'#1C1926',muted:'#746F80',primary:'#7257E9',border:'#E8E4F0',danger:'#D9495A'};
+export const palette = (dark: boolean) =>
+  dark
+    ? {
+        bg: '#121212',
+        card: '#1A1A1A',
+        text: '#FFFFFF',
+        muted: '#A3A3A3',
+        primary: '#FF6A00',
+        secondary: '#FF8C1A',
+        border: '#2A2A2A',
+        danger: '#FF3B30',
+      }
+    : {
+        bg: '#F7F7F7',
+        card: '#FFFFFF',
+        text: '#121212',
+        muted: '#6B6B6B',
+        primary: '#FF6A00',
+        secondary: '#FF8C1A',
+        border: '#E2E2E2',
+        danger: '#D93025',
+      };

@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';import { Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';import { palette,useApp } from '@/contexts/AppContext';
+import { LinearGradient } from 'expo-linear-gradient';
 export function Screen({children}:{children:ReactNode}){const{theme}=useApp();const c=palette(theme==='dark');return <View style={[s.screen,{backgroundColor:c.bg}]}>{children}</View>}
 export function Card({children,style}:{children:ReactNode;style?:any}){const{theme}=useApp();const c=palette(theme==='dark');return <View style={[s.card,{backgroundColor:c.card,borderColor:c.border},style]}>{children}</View>}
 export function AppText({children,muted=false,style}:{children:ReactNode;muted?:boolean;style?:any}){const{theme}=useApp();const c=palette(theme==='dark');return <Text style={[{color:muted?c.muted:c.text},style]}>{children}</Text>}
