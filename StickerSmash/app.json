@@ -36,7 +36,8 @@
           "backgroundColor": "#121212",
           "enableFullScreenImage_legacy": true
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

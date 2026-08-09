@@ -6,7 +6,10 @@ export type Difficulty =
   | 'Advanced'
   | string;
 
-export type SkillStatus = 'in_progress' | 'paused' | 'finished';
+export type SkillStatus =
+  | 'in_progress'
+  | 'paused'
+  | 'finished';
 
 export type CatalogSkill = {
   id: string;
@@ -19,10 +22,21 @@ export type CatalogSkill = {
   icon?: string | null;
 };
 
+export type SkillMedia = {
+  id: string;
+  type: 'image' | 'video';
+  uri: string;
+  createdAt: string;
+  caption?: string;
+};
+
 export type UserSkill = CatalogSkill & {
   userSkillId: string;
   status: SkillStatus;
   repetitions: number;
   seconds: number;
   xp: number;
+
+  // Photos and videos documenting the skill
+  media: SkillMedia[];
 };
