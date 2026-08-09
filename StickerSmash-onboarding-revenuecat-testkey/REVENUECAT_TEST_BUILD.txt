@@ -1,0 +1,9 @@
+SKILL+ REVENUECAT TEST BUILD
+
+RevenueCat Test Store public SDK key is wired in for DEVELOPMENT builds only.
+Entitlement: skill+ Pro
+Offering: default
+Free limits: 5 skills, 2 media items per skill.
+
+DO NOT submit a build to App Store review with a test_ RevenueCat key.
+For production, add EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=appl_... to your real .env.
