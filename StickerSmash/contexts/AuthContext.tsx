@@ -14,6 +14,11 @@ import {
   supabase,
 } from '@/lib/supabase';
 
+type SignUpResult = {
+  error: string | null;
+  needsVerification: boolean;
+};
+
 type Auth = {
   user: User | null;
   loading: boolean;
@@ -27,7 +32,7 @@ type Auth = {
     name: string,
     email: string,
     password: string
-  ) => Promise<string | null>;
+  ) => Promise<SignUpResult>;
 
   reset: (
     email: string
@@ -36,7 +41,8 @@ type Auth = {
   signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<Auth | null>(null);
+const AuthContext =
+  createContext<Auth | null>(null);
 
 export function AuthProvider({
   children,
@@ -49,39 +55,49 @@ export function AuthProvider({
   const [loading, setLoading] =
     useState(true);
 
-  /*
-   * Handle Supabase links such as:
-   *
-   * skillplus://auth/callback#access_token=...
-   *
-   * and:
-   *
-   * skillplus://reset-password#access_token=...
-   */
-  async function handleAuthUrl(url: string) {
+  async function handleAuthUrl(
+    url: string
+  ) {
     try {
-      console.log('AUTH DEEP LINK:', url);
+      console.log(
+        'AUTH DEEP LINK:',
+        url
+      );
 
-      const hashIndex = url.indexOf('#');
+      const hashIndex =
+        url.indexOf('#');
 
       if (hashIndex === -1) {
         return;
       }
 
-      const fragment = url.substring(hashIndex + 1);
+      const fragment =
+        url.substring(
+          hashIndex + 1
+        );
 
-      const params = new URLSearchParams(fragment);
+      const params =
+        new URLSearchParams(
+          fragment
+        );
 
       const accessToken =
-        params.get('access_token');
+        params.get(
+          'access_token'
+        );
 
       const refreshToken =
-        params.get('refresh_token');
+        params.get(
+          'refresh_token'
+        );
 
       const type =
         params.get('type');
 
-      if (!accessToken || !refreshToken) {
+      if (
+        !accessToken ||
+        !refreshToken
+      ) {
         console.log(
           'Auth link did not contain session tokens.'
         );
@@ -89,14 +105,22 @@ export function AuthProvider({
         return;
       }
 
-      const { data, error } =
-        await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
+      const {
+        data,
+        error,
+      } =
+        await supabase.auth.setSession(
+          {
+            access_token:
+              accessToken,
+
+            refresh_token:
+              refreshToken,
+          }
+        );
 
       if (error) {
-        console.error(
+        console.warn(
           'Failed to create session from deep link:',
           error
         );
@@ -104,60 +128,92 @@ export function AuthProvider({
         return;
       }
 
-      setSession(data.session);
+      setSession(
+        data.session
+      );
 
       console.log(
         'Supabase deep link successful:',
         type
       );
     } catch (error) {
-      console.error(
+      console.warn(
         'Error handling auth deep link:',
         error
       );
     }
   }
 
-  /*
-   * Initial auth/session setup.
-   */
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false);
       return;
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        setSession(data.session);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error(
-          'Failed to get Supabase session:',
+    let mounted = true;
+
+    async function initializeAuth() {
+      try {
+        const {
+          data,
+          error,
+        } =
+          await supabase.auth.getSession();
+
+        if (error) {
+          console.warn(
+            'Failed to get Supabase session:',
+            error
+          );
+        }
+
+        if (mounted) {
+          setSession(
+            data.session ?? null
+          );
+
+          setLoading(false);
+        }
+      } catch (error) {
+        console.warn(
+          'Failed to initialize Supabase auth:',
           error
         );
 
-        setLoading(false);
-      });
+        if (mounted) {
+          setSession(null);
+          setLoading(false);
+        }
+      }
+    }
+
+    initializeAuth();
 
     const { data } =
       supabase.auth.onAuthStateChange(
-        (_event, newSession) => {
-          setSession(newSession);
+        (
+          _event,
+          newSession
+        ) => {
+          if (!mounted) {
+            return;
+          }
+
+          setSession(
+            newSession
+          );
+
+          setLoading(false);
         }
       );
 
     return () => {
+      mounted = false;
+
       data.subscription.unsubscribe();
     };
   }, []);
 
-  /*
-   * Listen for Skill+ deep links while
-   * the app is already running.
-   */
   useEffect(() => {
     if (!isSupabaseConfigured) {
       return;
@@ -171,10 +227,6 @@ export function AuthProvider({
         }
       );
 
-    /*
-     * Handle a deep link that launched
-     * the app from a closed state.
-     */
     Linking.getInitialURL()
       .then((url) => {
         if (url) {
@@ -182,7 +234,7 @@ export function AuthProvider({
         }
       })
       .catch((error) => {
-        console.error(
+        console.warn(
           'Failed to read initial URL:',
           error
         );
@@ -196,51 +248,106 @@ export function AuthProvider({
   const signIn = async (
     email: string,
     password: string
-  ) => {
-    if (!isSupabaseConfigured) {
+  ): Promise<
+    string | null
+  > => {
+    if (
+      !isSupabaseConfigured
+    ) {
       return 'Add your Supabase URL and anon key to .env first.';
     }
 
-    const { error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const {
+      data,
+      error,
+    } =
+      await supabase.auth.signInWithPassword(
+        {
+          email,
+          password,
+        }
+      );
 
-    return error?.message ?? null;
+    if (error) {
+      return error.message;
+    }
+
+    setSession(
+      data.session
+    );
+
+    return null;
   };
 
   const signUp = async (
     name: string,
     email: string,
     password: string
-  ) => {
-    if (!isSupabaseConfigured) {
-      return 'Add your Supabase URL and anon key to .env first.';
+  ): Promise<SignUpResult> => {
+    if (
+      !isSupabaseConfigured
+    ) {
+      return {
+        error:
+          'Add your Supabase URL and anon key to .env first.',
+        needsVerification:
+          false,
+      };
     }
 
-    const { error } =
-      await supabase.auth.signUp({
-        email,
-        password,
+    const {
+      data,
+      error,
+    } =
+      await supabase.auth.signUp(
+        {
+          email,
+          password,
 
-        options: {
-          emailRedirectTo:
-            'skillplus://auth/callback',
+          options: {
+            emailRedirectTo:
+              'skillplus://auth/callback',
 
-          data: {
-            display_name: name,
+            data: {
+              display_name:
+                name,
+            },
           },
-        },
-      });
+        }
+      );
 
-    return error?.message ?? null;
+    if (error) {
+      return {
+        error:
+          error.message,
+
+        needsVerification:
+          false,
+      };
+    }
+
+    if (data.session) {
+      setSession(
+        data.session
+      );
+    }
+
+    return {
+      error: null,
+
+      needsVerification:
+        data.session === null,
+    };
   };
 
   const reset = async (
     email: string
-  ) => {
-    if (!isSupabaseConfigured) {
+  ): Promise<
+    string | null
+  > => {
+    if (
+      !isSupabaseConfigured
+    ) {
       return 'Add your Supabase URL and anon key to .env first.';
     }
 
@@ -253,26 +360,38 @@ export function AuthProvider({
         }
       );
 
-    return error?.message ?? null;
+    return (
+      error?.message ??
+      null
+    );
   };
 
-  const signOut = async () => {
-    const { error } =
-      await supabase.auth.signOut();
+  const signOut =
+    async (): Promise<void> => {
+      const { error } =
+        await supabase.auth.signOut();
 
-    if (error) {
-      console.error(
-        'Sign out failed:',
-        error
-      );
-    }
-  };
+      if (error) {
+        console.warn(
+          'Sign out failed:',
+          error
+        );
+
+        return;
+      }
+
+      setSession(null);
+    };
 
   return (
     <AuthContext.Provider
       value={{
-        user: session?.user ?? null,
+        user:
+          session?.user ??
+          null,
+
         loading,
+
         signIn,
         signUp,
         reset,
@@ -286,7 +405,9 @@ export function AuthProvider({
 
 export function useAuth() {
   const value =
-    useContext(AuthContext);
+    useContext(
+      AuthContext
+    );
 
   if (!value) {
     throw new Error(
