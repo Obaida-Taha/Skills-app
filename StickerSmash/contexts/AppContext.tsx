@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {
   createContext,
   ReactNode,
@@ -7,42 +8,66 @@ import {
   useMemo,
   useState,
 } from 'react';
+
 import { Appearance } from 'react-native';
+
+import {
+  addCatalogSkillToUser,
+  addCustomSkillToUser,
+  deleteUserSkill,
+  fetchMySkills,
+  updateUserSkill,
+} from '@/lib/user-skills';
+
+import { supabase } from '@/lib/supabase';
 
 import {
   CatalogSkill,
   UserSkill,
 } from '@/types';
 
-type ThemeMode = 'light' | 'dark';
+type ThemeMode =
+  | 'light'
+  | 'dark';
 
 type AppState = {
   skills: UserSkill[];
+
   theme: ThemeMode;
 
   unlockedAchievementIds: string[];
 
-  addSkill: (skill: CatalogSkill) => void;
+  addSkill: (
+    skill: CatalogSkill
+  ) => Promise<void>;
 
   addCustomSkill: (
     name: string,
     category: string
-  ) => void;
+  ) => Promise<void>;
 
   updateSkill: (
     id: string,
     patch: Partial<UserSkill>
+  ) => Promise<void>;
+
+  removeSkill: (
+    id: string
+  ) => Promise<void>;
+
+  unlockAchievement: (
+    id: string
   ) => void;
 
-  removeSkill: (id: string) => void;
-
-  unlockAchievement: (id: string) => void;
-
-  setTheme: (theme: ThemeMode) => void;
+  setTheme: (
+    theme: ThemeMode
+  ) => void;
 };
 
 const AppContext =
-  createContext<AppState | null>(null);
+  createContext<AppState | null>(
+    null
+  );
 
 export function AppProvider({
   children,
@@ -59,43 +84,31 @@ export function AppProvider({
 
   const [theme, setThemeState] =
     useState<ThemeMode>(
-      Appearance.getColorScheme() === 'dark'
+      Appearance.getColorScheme() ===
+        'dark'
         ? 'dark'
         : 'light'
     );
 
+  /*
+   * Load local-only preferences.
+   *
+   * Skills are NOT stored here anymore.
+   */
   useEffect(() => {
     async function loadSavedData() {
       try {
         const rows =
           await AsyncStorage.multiGet([
-            'skillplus.skills',
             'skillplus.theme',
             'skillplus.achievements',
           ]);
 
-        const savedSkills =
+        const savedTheme =
           rows[0][1];
 
-        const savedTheme =
-          rows[1][1];
-
         const savedAchievements =
-          rows[2][1];
-
-        if (savedSkills) {
-          const parsed: UserSkill[] =
-            JSON.parse(savedSkills);
-
-          const repaired =
-            parsed.map((skill) => ({
-              ...skill,
-              media:
-                skill.media ?? [],
-            }));
-
-          setSkills(repaired);
-        }
+          rows[1][1];
 
         if (savedTheme) {
           setThemeState(
@@ -112,7 +125,7 @@ export function AppProvider({
         }
       } catch (error) {
         console.error(
-          'Failed to load saved app data:',
+          'Failed to load local app data:',
           error
         );
       }
@@ -121,18 +134,58 @@ export function AppProvider({
     loadSavedData();
   }, []);
 
+  /*
+   * Skills belong to the authenticated
+   * Supabase account.
+   */
   useEffect(() => {
-    AsyncStorage.setItem(
-      'skillplus.skills',
-      JSON.stringify(skills)
-    ).catch((error) => {
-      console.error(
-        'Failed to save skills:',
-        error
-      );
-    });
-  }, [skills]);
+    async function loadUserSkills() {
+      try {
+        const {
+          data: { session },
+        } =
+          await supabase.auth.getSession();
 
+        if (!session) {
+          setSkills([]);
+          return;
+        }
+
+        const loadedSkills =
+          await fetchMySkills();
+
+        setSkills(loadedSkills);
+      } catch (error) {
+        console.error(
+          'Failed to load user skills:',
+          error
+        );
+      }
+    }
+
+    loadUserSkills();
+
+    const { data } =
+      supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          if (!session) {
+            setSkills([]);
+            return;
+          }
+
+          loadUserSkills();
+        }
+      );
+
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  /*
+   * Achievements are still local.
+   * We'll move these to Supabase later.
+   */
   useEffect(() => {
     AsyncStorage.setItem(
       'skillplus.achievements',
@@ -147,63 +200,77 @@ export function AppProvider({
     });
   }, [unlockedAchievementIds]);
 
-  const addSkill = (
+  const addSkill = async (
     skill: CatalogSkill
-  ) => {
-    setSkills((current) => {
-      const alreadyAdded =
-        current.some(
-          (item) =>
-            item.id === skill.id
+  ): Promise<void> => {
+    const alreadyAdded =
+      skills.some(
+        (item) =>
+          item.id === skill.id
+      );
+
+    if (alreadyAdded) {
+      return;
+    }
+
+    try {
+      const newSkill =
+        await addCatalogSkillToUser(
+          skill
         );
 
-      if (alreadyAdded) {
-        return current;
-      }
-
-      const newSkill: UserSkill =
-        {
-          ...skill,
-
-          userSkillId:
-            `local-${Date.now()}`,
-
-          status: 'in_progress',
-
-          repetitions: 0,
-          seconds: 0,
-          xp: 0,
-
-          media: [],
-        };
-
-      return [
-        ...current,
+      setSkills((current) => [
         newSkill,
-      ];
-    });
+        ...current,
+      ]);
+    } catch (error) {
+      console.error(
+        'Failed to add skill:',
+        error
+      );
+
+      throw error;
+    }
   };
 
-  const addCustomSkill = (
+  const addCustomSkill = async (
     name: string,
     category: string
-  ) => {
-    addSkill({
-      id: `custom-${Date.now()}`,
-      name,
-      category,
-      subCategory: 'Custom',
-      difficulty: 'Beginner',
-      estimatedHours: '—',
-      description:
-        'A custom learning goal.',
-    });
+  ): Promise<void> => {
+    try {
+      const newSkill =
+        await addCustomSkillToUser(
+          name,
+          category
+        );
+
+      setSkills((current) => [
+        newSkill,
+        ...current,
+      ]);
+    } catch (error) {
+      console.error(
+        'Failed to add custom skill:',
+        error
+      );
+
+      throw error;
+    }
   };
 
-  const updateSkill = (
+  /*
+   * Optimistic update:
+   *
+   * UI changes immediately,
+   * database save happens afterward.
+   */
+  const updateSkill = async (
     id: string,
     patch: Partial<UserSkill>
-  ) => {
+  ): Promise<void> => {
+    const previousSkills =
+      skills;
+
     setSkills((current) =>
       current.map((skill) =>
         skill.userSkillId === id
@@ -214,17 +281,71 @@ export function AppProvider({
           : skill
       )
     );
+
+    try {
+      await updateUserSkill(
+        id,
+        patch
+      );
+    } catch (error) {
+      console.error(
+        'Failed to update skill:',
+        error
+      );
+
+      /*
+       * Try to restore the authoritative
+       * state from Supabase.
+       */
+      try {
+        const freshSkills =
+          await fetchMySkills();
+
+        setSkills(freshSkills);
+      } catch (refreshError) {
+        console.error(
+          'Failed to refresh user skills:',
+          refreshError
+        );
+
+        /*
+         * If even the refresh fails,
+         * restore what the UI had before.
+         */
+        setSkills(previousSkills);
+      }
+
+      throw error;
+    }
   };
 
-  const removeSkill = (
+  const removeSkill = async (
     id: string
-  ) => {
+  ): Promise<void> => {
+    const previousSkills =
+      skills;
+
     setSkills((current) =>
       current.filter(
         (skill) =>
           skill.userSkillId !== id
       )
     );
+
+    try {
+      await deleteUserSkill(id);
+    } catch (error) {
+      console.error(
+        'Failed to remove skill:',
+        error
+      );
+
+      setSkills(
+        previousSkills
+      );
+
+      throw error;
+    }
   };
 
   const unlockAchievement = (
@@ -249,7 +370,9 @@ export function AppProvider({
   const setTheme = (
     newTheme: ThemeMode
   ) => {
-    setThemeState(newTheme);
+    setThemeState(
+      newTheme
+    );
 
     AsyncStorage.setItem(
       'skillplus.theme',
@@ -266,13 +389,17 @@ export function AppProvider({
     useMemo<AppState>(
       () => ({
         skills,
+
         theme,
 
         unlockedAchievementIds,
 
         addSkill,
+
         addCustomSkill,
+
         updateSkill,
+
         removeSkill,
 
         unlockAchievement,
@@ -317,9 +444,12 @@ export const palette = (
         card: '#1A1A1A',
         text: '#FFFFFF',
         muted: '#A3A3A3',
+
         primary: '#FF6A00',
         secondary: '#FF8C1A',
+
         border: '#2A2A2A',
+
         danger: '#FF3B30',
       }
     : {
@@ -327,8 +457,11 @@ export const palette = (
         card: '#FFFFFF',
         text: '#121212',
         muted: '#6B6B6B',
+
         primary: '#FF6A00',
         secondary: '#FF8C1A',
+
         border: '#E2E2E2',
+
         danger: '#D93025',
       };
