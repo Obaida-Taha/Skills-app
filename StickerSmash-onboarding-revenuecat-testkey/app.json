@@ -4,14 +4,17 @@
     "slug": "skillplus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "skillplus",
+    "scheme": [
+      "skillplus",
+      "rc-555c7de623"
+    ],
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.obaidataha.skillplus",
       "appleTeamId": "TQ8K5RDT5N",
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
       "package": "com.obaidataha.skillplus",
