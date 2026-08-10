@@ -10,7 +10,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.obaidataha.skillplus",
-      "appleTeamId": "TQ8K5RDT5N"
+      "appleTeamId": "TQ8K5RDT5N",
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.obaidataha.skillplus",
