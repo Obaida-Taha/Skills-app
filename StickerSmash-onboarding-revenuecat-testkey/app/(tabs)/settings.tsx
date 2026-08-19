@@ -33,6 +33,10 @@ import {
 
 import { UserProfile } from '@/types';
 
+import {
+  showSkillPlusPaywall,
+} from '@/lib/revenuecat';
+
 export default function Settings() {
   const {
     theme,
@@ -45,13 +49,12 @@ export default function Settings() {
     signOut,
   } = useAuth();
 
-  const {
-    isPremium,
-    loading: premiumLoading,
-    configured: premiumConfigured,
-    presentPaywall,
-    restorePurchases,
-  } = useSubscription();
+    const {
+      isPremium,
+      loading: premiumLoading,
+      configured: premiumConfigured,
+      restorePurchases,
+    } = useSubscription();
 
   const [profile, setProfile] =
     useState<UserProfile | null>(null);
@@ -268,13 +271,27 @@ export default function Settings() {
           </View>
         </Card>
 
-        {!isPremium && (
-          <Button
-            title={premiumLoading ? 'Loading Premium…' : 'Upgrade to Skill+ Premium'}
-            disabled={premiumLoading}
-            onPress={() => void presentPaywall()}
-          />
-        )}
+          {!isPremium && (
+            <Button
+              title={
+                premiumLoading
+                  ? 'Loading Premium…'
+                  : 'Upgrade to Skill+ Pro'
+              }
+              disabled={premiumLoading}
+              onPress={async () => {
+                const purchased =
+                  await showSkillPlusPaywall();
+
+                if (purchased) {
+                  Alert.alert(
+                    'Skill+ Pro',
+                    'Skill+ Pro has been unlocked.'
+                  );
+                }
+              }}
+            />
+          )}
 
         <Button
           secondary
