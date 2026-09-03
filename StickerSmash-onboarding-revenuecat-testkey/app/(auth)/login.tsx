@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  View,
 } from 'react-native';
 import { router } from 'expo-router';
 
@@ -136,7 +136,11 @@ export default function Login() {
 
       setMode('login');
     } catch (error) {
-      console.warn('Authentication request failed:', error);
+      console.warn(
+        'Authentication request failed:',
+        error
+      );
+
       Alert.alert(
         'Connection problem',
         'Could not reach the authentication service. Please try again.'
@@ -160,11 +164,11 @@ export default function Login() {
           contentContainerStyle={styles.wrap}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>
-              S+
-            </Text>
-          </View>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
 
           <AppText style={styles.title}>
             {mode === 'login'
@@ -284,21 +288,12 @@ const styles = StyleSheet.create({
     gap: 14,
   },
 
-  logo: {
-    width: 74,
-    height: 74,
-    borderRadius: 24,
-    backgroundColor: '#FF6A00',
+  logoImage: {
+    width: 110,
+    height: 110,
     alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 12,
-  },
-
-  logoText: {
-    fontSize: 29,
-    fontWeight: '900',
-    color: '#fff',
+    borderRadius: 65,
   },
 
   title: {
