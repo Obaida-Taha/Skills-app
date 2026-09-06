@@ -5,4 +5,7 @@
 .env.*
 !.env.example
 expo-env.d.ts
-# @end expo-cli
+# @end expo-cli.expo/
+
+.expo/
+node_modules/
