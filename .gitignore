@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+.expo/
+dist/
+build/
+.expo/
+node_modules/
+.DS_Store
+.env
+.env.*
+!.env.example
