@@ -1,4 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
+
 import {
   Alert,
   Modal,
@@ -24,18 +26,26 @@ import { AchievementsCard } from '@/components/achievements/AchievementsCard';
 import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { FREE_MEDIA_PER_SKILL, FREE_SKILL_LIMIT } from '@/features/premium/config';
+
+import {
+  FREE_MEDIA_PER_SKILL,
+  FREE_SKILL_LIMIT,
+} from '@/features/premium/config';
 
 import {
   getMyProfile,
   updateMyProfile,
 } from '@/lib/profile';
 
-import { UserProfile } from '@/types';
-
 import {
   showSkillPlusPaywall,
 } from '@/lib/revenuecat';
+
+import {
+  deleteMyAccount,
+} from '@/lib/delete-account';
+
+import { UserProfile } from '@/types';
 
 export default function Settings() {
   const {
@@ -49,12 +59,12 @@ export default function Settings() {
     signOut,
   } = useAuth();
 
-    const {
-      isPremium,
-      loading: premiumLoading,
-      configured: premiumConfigured,
-      restorePurchases,
-    } = useSubscription();
+  const {
+    isPremium,
+    loading: premiumLoading,
+    configured: premiumConfigured,
+    restorePurchases,
+  } = useSubscription();
 
   const [profile, setProfile] =
     useState<UserProfile | null>(null);
@@ -65,8 +75,14 @@ export default function Settings() {
   const [editOpen, setEditOpen] =
     useState(false);
 
+  const [
+    deletingAccount,
+    setDeletingAccount,
+  ] = useState(false);
+
   const xp = skills.reduce(
-    (total, skill) => total + skill.xp,
+    (total, skill) =>
+      total + skill.xp,
     0
   );
 
@@ -89,7 +105,7 @@ export default function Settings() {
       return;
     }
 
-    loadProfile();
+    void loadProfile();
   }, [user]);
 
   async function loadProfile() {
@@ -105,9 +121,94 @@ export default function Settings() {
         'PROFILE LOAD ERROR:',
         error
       );
+
       setProfile(null);
     } finally {
       setLoadingProfile(false);
+    }
+  }
+
+  function confirmDeleteAccount() {
+    if (!user || deletingAccount) {
+      return;
+    }
+
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your Skill+ account, skills, progress, achievements and uploaded journey media. This cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'Your account and associated data will be permanently deleted.',
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Delete permanently',
+                  style: 'destructive',
+                  onPress: () =>
+                    void handleDeleteAccount(),
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  }
+
+  async function handleDeleteAccount() {
+    if (!user || deletingAccount) {
+      return;
+    }
+
+    try {
+      setDeletingAccount(true);
+
+      const userId = user.id;
+
+      await deleteMyAccount();
+
+      // Remove local user-specific achievements.
+      await AsyncStorage.removeItem(
+        `skillplus.achievements.${userId}`
+      );
+
+      // Clear the local auth/session state.
+      try {
+        await signOut();
+      } catch (signOutError) {
+        console.warn(
+          'SIGN OUT AFTER DELETE WARNING:',
+          signOutError
+        );
+      }
+
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error(
+        'ACCOUNT DELETE ERROR:',
+        error
+      );
+
+      Alert.alert(
+        'Could not delete account',
+        error instanceof Error
+          ? error.message
+          : 'Please try again.'
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -123,9 +224,12 @@ export default function Settings() {
         <Pressable
           onPress={() => {
             if (!user) {
-              router.replace('/(auth)/login');
+              router.replace(
+                '/(auth)/login'
+              );
               return;
             }
+
             setEditOpen(true);
           }}
         >
@@ -246,9 +350,16 @@ export default function Settings() {
         <AchievementsCard />
 
         <Card style={styles.premiumCard}>
-          <View style={{ flex: 1, gap: 4 }}>
+          <View
+            style={{
+              flex: 1,
+              gap: 4,
+            }}
+          >
             <AppText style={styles.heading}>
-              {isPremium ? 'Skill+ Premium' : 'Free plan'}
+              {isPremium
+                ? 'Skill+ Premium'
+                : 'Free plan'}
             </AppText>
 
             <AppText muted>
@@ -258,46 +369,63 @@ export default function Settings() {
             </AppText>
 
             {!premiumConfigured && (
-              <AppText muted style={{ marginTop: 6, fontSize: 12 }}>
-                RevenueCat is not configured in this build yet.
+              <AppText
+                muted
+                style={{
+                  marginTop: 6,
+                  fontSize: 12,
+                }}
+              >
+                RevenueCat is not
+                configured in this build
+                yet.
               </AppText>
             )}
           </View>
 
           <View style={styles.planBadge}>
-            <AppText style={{ color: '#FF6A00', fontWeight: '900' }}>
-              {isPremium ? 'PREMIUM' : 'FREE'}
+            <AppText
+              style={{
+                color: '#FF6A00',
+                fontWeight: '900',
+              }}
+            >
+              {isPremium
+                ? 'PREMIUM'
+                : 'FREE'}
             </AppText>
           </View>
         </Card>
 
-          {!isPremium && (
-            <Button
-              title={
-                premiumLoading
-                  ? 'Loading Premium…'
-                  : 'Upgrade to Skill+ Pro'
-              }
-              disabled={premiumLoading}
-              onPress={async () => {
-                const purchased =
-                  await showSkillPlusPaywall();
+        {!isPremium && (
+          <Button
+            title={
+              premiumLoading
+                ? 'Loading Premium…'
+                : 'Upgrade to Skill+ Pro'
+            }
+            disabled={premiumLoading}
+            onPress={async () => {
+              const purchased =
+                await showSkillPlusPaywall();
 
-                if (purchased) {
-                  Alert.alert(
-                    'Skill+ Pro',
-                    'Skill+ Pro has been unlocked.'
-                  );
-                }
-              }}
-            />
-          )}
+              if (purchased) {
+                Alert.alert(
+                  'Skill+ Pro',
+                  'Skill+ Pro has been unlocked.'
+                );
+              }
+            }}
+          />
+        )}
 
         <Button
           secondary
           title="Restore purchases"
           disabled={premiumLoading}
-          onPress={() => void restorePurchases()}
+          onPress={() =>
+            void restorePurchases()
+          }
         />
 
         <Button
@@ -306,14 +434,40 @@ export default function Settings() {
           onPress={() =>
             Alert.alert(
               'Contact',
-              'Email support@skillplus.app'
+              'Email info@skillplus.site'
             )
           }
         />
 
+        <Card style={styles.accountCard}>
+          <AppText style={styles.heading}>
+            Account
+          </AppText>
+
+          <AppText muted>
+            Manage your Skill+ account.
+            Account deletion is permanent
+            and cannot be undone.
+          </AppText>
+
+          <Button
+            danger
+            title={
+              deletingAccount
+                ? 'Deleting account…'
+                : 'Delete account'
+            }
+            disabled={deletingAccount}
+            onPress={
+              confirmDeleteAccount
+            }
+          />
+        </Card>
+
         <Button
           danger
           title="Log out"
+          disabled={deletingAccount}
           onPress={async () => {
             await signOut();
 
@@ -325,7 +479,9 @@ export default function Settings() {
       </ScrollView>
 
       <EditProfileModal
-        visible={editOpen && !!user}
+        visible={
+          editOpen && !!user
+        }
         profile={profile}
         onClose={() =>
           setEditOpen(false)
@@ -552,11 +708,9 @@ const styles =
       width: 52,
       height: 52,
       borderRadius: 18,
-      backgroundColor:
-        '#FF6A00',
+      backgroundColor: '#FF6A00',
       alignItems: 'center',
-      justifyContent:
-        'center',
+      justifyContent: 'center',
     },
 
     avatarText: {
@@ -604,12 +758,16 @@ const styles =
       paddingVertical: 6,
     },
 
+    accountCard: {
+      gap: 12,
+      marginTop: 4,
+    },
+
     modalBackdrop: {
       flex: 1,
       justifyContent:
         'flex-end',
-      backgroundColor:
-        '#0008',
+      backgroundColor: '#0008',
       padding: 18,
       paddingBottom: 35,
     },
